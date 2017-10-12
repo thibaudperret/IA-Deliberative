@@ -2,6 +2,10 @@ package template;
 
 /* import table */
 import logist.simulation.Vehicle;
+
+import java.util.ArrayList;
+import java.util.List;
+
 import logist.agent.Agent;
 import logist.behavior.DeliberativeBehavior;
 import logist.plan.Plan;
@@ -29,6 +33,73 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
 
 	/* the planning class */
 	Algorithm algorithm;
+	
+	
+	/*Transition functions */
+	public State nextState(State old, Decision d) {
+		
+		if(d.isGoAndDeliver()) {
+			
+			State.Builder builder = new State.Builder();
+			GoAndDeliver dGAD = (GoAndDeliver)d;
+
+			City from = old.currentCity();
+			City to = d.destination();
+			
+			List<StateTask> toDeliverTmp = new ArrayList<StateTask>(old.toDeliver());
+			toDeliverTmp.remove(d.task());
+			List<Decision> historyTmp = new ArrayList<Decision>(old.history());
+			historyTmp.add(d);
+			
+			builder.setCity(d.destination());
+			builder.setAvailable(old.available());
+			builder.setHistory(historyTmp);
+			builder.setToDeliver(toDeliverTmp);
+			double taskWin = td.reward(from, to) - from.distanceTo(to) * agent.vehicles().get(0).costPerKm();
+			builder.setTotalWin(old.totalWin() + taskWin);
+			
+			return builder.build();
+		
+		} else {
+			
+			State.Builder builder = new State.Builder();
+			GoAndPickUp dGAD = (GoAndPickUp)d;
+			City from = old.currentCity();
+			City to = d.destination();
+			
+			List<StateTask> toDeliverTmp = new ArrayList<StateTask>(old.toDeliver());
+			toDeliverTmp.add(d.task());
+			List<Decision> historyTmp = new ArrayList<Decision>(old.history());
+			historyTmp.add(d);
+			List<StateTask> availableTmp = new ArrayList<StateTask>(old.available());
+			availableTmp.remove(d.task());
+			
+			builder.setCity(d.destination());
+			builder.setAvailable(availableTmp);
+			builder.setHistory(historyTmp);
+			builder.setToDeliver(toDeliverTmp);
+			double taskWin = - from.distanceTo(to) * agent.vehicles().get(0).costPerKm();
+			builder.setTotalWin(old.totalWin() + taskWin);
+			
+			return builder.build();
+			
+		}
+		
+	}
+	
+	public List<State> nextStates(State old) {
+		List<State> nextStates = new ArrayList<State>();
+		for (Decision d : old.doable()) {
+			nextStates.add(nextState(old, d));
+		}
+		return nextStates;
+	}
+	
+	
+	
+	
+	
+	
 	
 	@Override
 	public void setup(Topology topology, TaskDistribution td, Agent agent) {
