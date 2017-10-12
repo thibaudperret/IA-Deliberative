@@ -78,6 +78,10 @@ public class State {
 		return weight;
 	}
 	
+	public boolean isFinalState() {
+		return toDeliver.isEmpty() && available.isEmpty();
+	}
+	
 	
 	@Override
 	public boolean equals(Object o) {
