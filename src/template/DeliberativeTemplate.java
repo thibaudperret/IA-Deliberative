@@ -8,6 +8,7 @@ import java.util.List;
 
 import logist.agent.Agent;
 import logist.behavior.DeliberativeBehavior;
+import logist.plan.Action;
 import logist.plan.Plan;
 import logist.task.Task;
 import logist.task.TaskDistribution;
@@ -41,7 +42,7 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
 		if(d.isGoAndDeliver()) {
 			
 			State.Builder builder = new State.Builder();
-			GoAndDeliver dGAD = (GoAndDeliver)d;
+			d = (GoAndDeliver)d;
 
 			City from = old.currentCity();
 			City to = d.destination();
@@ -63,7 +64,7 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
 		} else {
 			
 			State.Builder builder = new State.Builder();
-			GoAndPickUp dGAD = (GoAndPickUp)d;
+			d = (GoAndPickUp)d;
 			City from = old.currentCity();
 			City to = d.destination();
 			
@@ -93,6 +94,39 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
 			nextStates.add(nextState(old, d));
 		}
 		return nextStates;
+	}
+	
+	public State bfs(State initialState) {
+		List<State> q = new ArrayList<State>();
+		q.add(initialState);
+		List<State> c = new ArrayList<State>();
+		boolean solved = false, failure = false;
+		State current;
+		State solution = null;
+		
+		do {
+			if (q.isEmpty()) {
+				failure = true;
+			} else {
+				current = q.get(0);
+				q = q.subList(1, q.size());
+				if(current.isFinalState()) {
+					solved = true;
+					solution = current;
+				}
+				if(!(c.contains(current))) {
+					c.add(current);
+					q.addAll(nextStates(current));					
+				}
+				
+			}			
+		} while(!solved && !failure);
+		
+		if(failure) {
+			return null;
+		}else {
+			return solution;
+		}		
 	}
 	
 	
@@ -128,8 +162,43 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
 			plan = naivePlan(vehicle, tasks);
 			break;
 		case BFS:
-			// ...
-			plan = naivePlan(vehicle, tasks);
+			
+			//We construct the initial state 
+			
+			State.Builder initiaStateBuilder = new State.Builder();
+			List<StateTask> stateTasks = new ArrayList<StateTask>();
+			for(Task t : tasks) {
+				stateTasks.add(new StateTask(t.pickupCity, t.deliveryCity, t.weight));
+			} 
+			initiaStateBuilder.setAvailable(stateTasks);
+			initiaStateBuilder.setToDeliver(new ArrayList<StateTask>());
+			initiaStateBuilder.setHistory(new ArrayList<Decision>());
+			initiaStateBuilder.setCity(vehicle.getCurrentCity());
+			initiaStateBuilder.setTotalWin(0);
+			
+			//We compute final state with bfs
+			
+			State solution = bfs(initiaStateBuilder.build());
+			
+			//We compute the successive actions to take, from bfs state history
+			
+			List<Action> actions = new ArrayList<Action>();
+			for(Decision d: solution.history()) {
+				StateTask st = d.task();
+				for(Task t : tasks) {
+					if(st.from().equals(t.pickupCity) && st.to().equals(t.pickupCity)) {
+						
+						if(d.isGoAndDeliver()) {
+							actions.add(new Action.Delivery(t));
+						} else {
+							actions.add(new Action.Pickup(t));
+						}
+						
+					}
+				}
+			}
+			
+			plan = new Plan(vehicle.getCurrentCity(), actions);
 			break;
 		default:
 			throw new AssertionError("Should not happen.");

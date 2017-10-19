@@ -2,6 +2,7 @@ package template;
 
 import java.util.Objects;
 
+import logist.task.Task;
 import logist.topology.Topology.City;
 
 public class StateTask {
