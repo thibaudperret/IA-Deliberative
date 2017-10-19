@@ -44,6 +44,10 @@ public class StateTask {
 	public int hashCode() {
 		return Objects.hash(from, to, weight);
 	}
-	
+    
+    @Override
+    public String toString() {
+        return from + " -> " + to + "(" + weight + ")";
+    }	
 	
 }

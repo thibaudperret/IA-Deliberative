@@ -33,5 +33,10 @@ public class GoAndPickUp extends Decision {
 	public int hashCode() {
 		return Objects.hash(destination(), "GoAndPickUp");
 	}
+    
+    @Override
+    public String toString() {
+        return "GAP " + destination() + " -> " + task().to();
+    }
 
 }

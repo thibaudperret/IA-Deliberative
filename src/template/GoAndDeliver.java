@@ -34,4 +34,10 @@ public class GoAndDeliver extends Decision {
 	public int hashCode() {
 		return Objects.hash(destination(), "GoAndDeliver");
 	}
+	
+	@Override
+	public String toString() {
+	    return "GAD " + destination();
+	}
+	
 }

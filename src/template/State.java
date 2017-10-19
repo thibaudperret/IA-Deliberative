@@ -80,8 +80,7 @@ public class State {
 			State oState = (State)o;
 			return oState.toDeliver().equals(toDeliver)     && 
 				   oState.available().equals(available)     && 
-				   oState.currentCity().equals(currentCity) && 
-				   oState.acceptableWeight() == weightAcceptable; 
+				   oState.currentCity().equals(currentCity);
 			
 		} else {
 			return false;
@@ -90,8 +89,13 @@ public class State {
 	
 	@Override
 	public int hashCode() {
-		return Objects.hash(toDeliver, available, currentCity, weightAcceptable);
+		return Objects.hash(toDeliver, available, currentCity);
 	}
+    
+    @Override
+    public String toString() {
+        return history.toString();
+    }
 	
 	public static class Builder {
 		
