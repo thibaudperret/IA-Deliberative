@@ -55,8 +55,9 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
 			builder.setCity(d.destination());
 			builder.setAvailable(old.available());
 			builder.setHistory(historyTmp);
+			builder.setAcceptableWeight(old.acceptableWeight() + d.task().weight());
 			builder.setToDeliver(toDeliverTmp);
-			double taskWin = td.reward(from, to) - from.distanceTo(to) * agent.vehicles().get(0).costPerKm();
+			double taskWin = td.reward(d.task().from(), d.task().to()) - from.distanceTo(to) * agent.vehicles().get(0).costPerKm();
 			builder.setTotalWin(old.totalWin() + taskWin);
 			
 			return builder.build();
@@ -64,7 +65,6 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
 		} else {
 			
 			State.Builder builder = new State.Builder();
-			d = (GoAndPickUp)d;
 			City from = old.currentCity();
 			City to = d.destination();
 			
@@ -77,6 +77,7 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
 			
 			builder.setCity(d.destination());
 			builder.setAvailable(availableTmp);
+			builder.setAcceptableWeight(old.acceptableWeight() - d.task().weight());
 			builder.setHistory(historyTmp);
 			builder.setToDeliver(toDeliverTmp);
 			double taskWin = - from.distanceTo(to) * agent.vehicles().get(0).costPerKm();
@@ -95,6 +96,8 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
 		}
 		return nextStates;
 	}
+	
+	//BFS-Algorithm
 	
 	public State bfs(State initialState) {
 		List<State> q = new ArrayList<State>();
@@ -172,6 +175,7 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
 			} 
 			initiaStateBuilder.setAvailable(stateTasks);
 			initiaStateBuilder.setToDeliver(new ArrayList<StateTask>());
+			initiaStateBuilder.setAcceptableWeight(vehicle.capacity());
 			initiaStateBuilder.setHistory(new ArrayList<Decision>());
 			initiaStateBuilder.setCity(vehicle.getCurrentCity());
 			initiaStateBuilder.setTotalWin(0);

@@ -17,12 +17,12 @@ public class State {
 	private double weightAcceptable;
 	private double totalWin;
 	
-	public State(List<StateTask> toDeliver, List<StateTask> available, List<Decision> history, City currentCity,  double totalWin) {
+	public State(List<StateTask> toDeliver, List<StateTask> available, List<Decision> history, City currentCity,  double totalWin, double weightAcceptable) {
 		this.toDeliver = new ArrayList<StateTask>(toDeliver);
 		this.available = new ArrayList<StateTask>(available);
 		this.history = new ArrayList<Decision>(history);
 		this.currentCity = currentCity;
-		this.weightAcceptable = computeWeight();
+		this.weightAcceptable = weightAcceptable;
 		this.totalWin = totalWin;
 		initDoable();
 		
@@ -61,23 +61,14 @@ public class State {
 		return currentCity;
 	}
 	
-	public double currentWeight() {
+	public double acceptableWeight() {
 		return weightAcceptable;
 	}
 	
 	public double totalWin() {
 		return totalWin;
 	}
-	
-	private double computeWeight() {
-		double weight = 0;
-		for(StateTask t : toDeliver) {
-			weight += t.weight();
-		}
-	
-		return weight;
-	}
-	
+		
 	public boolean isFinalState() {
 		return toDeliver.isEmpty() && available.isEmpty();
 	}
@@ -90,7 +81,7 @@ public class State {
 			return oState.toDeliver().equals(toDeliver)     && 
 				   oState.available().equals(available)     && 
 				   oState.currentCity().equals(currentCity) && 
-				   oState.currentWeight() == weightAcceptable; 
+				   oState.acceptableWeight() == weightAcceptable; 
 			
 		} else {
 			return false;
@@ -110,6 +101,7 @@ public class State {
 		private List<Decision> history;
 		private City currentCity;
 		private double totalWin;
+		private double acceptableWeight;
 		
 		public void setToDeliver(List<StateTask> toDeliver) {
 			this.toDeliver = new ArrayList<StateTask>(toDeliver);
@@ -127,12 +119,16 @@ public class State {
 			this.currentCity = city;
 		}
 		
+		public void setAcceptableWeight(double acceptableWeight) {
+			this.acceptableWeight = acceptableWeight;
+		}
+		
 		public void setTotalWin(double totalWin) {
 			this.totalWin = totalWin;
 		}
 		
 		public State build() {
-			return new State(toDeliver, available, history, currentCity, totalWin);
+			return new State(toDeliver, available, history, currentCity, totalWin, acceptableWeight);
 		}
 		
 	}
