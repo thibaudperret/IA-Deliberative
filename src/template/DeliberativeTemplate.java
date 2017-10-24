@@ -4,6 +4,7 @@ package template;
 import logist.simulation.Vehicle;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 import logist.agent.Agent;
@@ -23,7 +24,7 @@ import logist.topology.Topology.City;
 public class DeliberativeTemplate implements DeliberativeBehavior {
 
     enum Algorithm {
-        BFS, ASTAR
+        BFS, OBFS, ASTAR, CDASTAR
     }
 
     /* Environment */
@@ -38,51 +39,52 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
     Algorithm algorithm;
 
     /* Transition functions */
-    public State nextState(State old, Decision d) {
-
+    public State nextState(State current, Decision d) {
         if (d.isGoAndDeliver()) {
-
+            // if we decide to deliver a packet
+            
             State.Builder builder = new State.Builder();
             d = (GoAndDeliver) d;
 
-            City from = old.currentCity();
+            City from = current.currentCity();
             City to = d.destination();
 
-            List<StateTask> toDeliverTmp = new ArrayList<StateTask>(old.toDeliver());
+            List<Task> toDeliverTmp = new ArrayList<Task>(current.toDeliver());
             toDeliverTmp.remove(d.task());
-            List<Decision> historyTmp = new ArrayList<Decision>(old.history());
+            List<Decision> historyTmp = new ArrayList<Decision>(current.history());
             historyTmp.add(d);
 
             builder.setCity(d.destination());
-            builder.setAvailable(old.available());
+            builder.setAvailable(current.available());
             builder.setHistory(historyTmp);
-            builder.setAcceptableWeight(old.acceptableWeight() + d.task().weight());
+            builder.setAcceptableWeight(current.acceptableWeight() + d.task().weight);
             builder.setToDeliver(toDeliverTmp);
-            double taskWin = td.reward(d.task().from(), d.task().to()) - (from.distanceTo(d.task().from()) + d.task().from().distanceTo(d.task().to())) * agent.vehicles().get(0).costPerKm();
-            builder.setTotalWin(old.totalWin() + taskWin);
+            double taskWin = - from.distanceTo(d.task().deliveryCity) * agent.vehicles().get(0).costPerKm()/* + d.task().reward */;
+            builder.setTotalWin(current.totalWin() + taskWin);
 
             return builder.build();
-
-        } else {
+        } else {            
+            // if we decide to pick up a packet
 
             State.Builder builder = new State.Builder();
-            City from = old.currentCity();
+            City from = current.currentCity();
             City to = d.destination();
 
-            List<StateTask> toDeliverTmp = new ArrayList<StateTask>(old.toDeliver());
+            List<Task> toDeliverTmp = new ArrayList<Task>(current.toDeliver());
             toDeliverTmp.add(d.task());
-            List<Decision> historyTmp = new ArrayList<Decision>(old.history());
+            List<Decision> historyTmp = new ArrayList<Decision>(current.history());
             historyTmp.add(d);
-            List<StateTask> availableTmp = new ArrayList<StateTask>(old.available());
+            List<Task> availableTmp = new ArrayList<Task>(current.available());
             availableTmp.remove(d.task());
 
             builder.setCity(d.destination());
             builder.setAvailable(availableTmp);
-            builder.setAcceptableWeight(old.acceptableWeight() - d.task().weight());
+            builder.setAcceptableWeight(current.acceptableWeight() - d.task().weight);
             builder.setHistory(historyTmp);
             builder.setToDeliver(toDeliverTmp);
-            double taskWin = -from.distanceTo(to) * agent.vehicles().get(0).costPerKm();
-            builder.setTotalWin(old.totalWin() + taskWin);
+
+            double taskWin = - from.distanceTo(d.task().pickupCity) * agent.vehicles().get(0).costPerKm();
+            builder.setTotalWin(current.totalWin() + taskWin);
 
             return builder.build();
 
@@ -97,53 +99,151 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
         }
         return nextStates;
     }
-
-    // BFS-Algorithm
-
+    
+    private boolean containsEquivalent(List<State> c, State toCheck) {
+        for (State s : c) {
+            if (s.equivalent(toCheck)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
     public State bfs(State initialState) {
         List<State> q = new ArrayList<State>();
         q.add(initialState);
         List<State> c = new ArrayList<State>();
-        
-        // TODO: supprimer
-        List<State> finals = new ArrayList<State>();
 
         State current;
         State solution = null;
-        double bestCost = Integer.MAX_VALUE;
 
         do {            
             current = q.get(0);
             q = q.subList(1, q.size());
             
             if (current.isFinalState()) {
-                finals.add(current);
-                if (current.totalWin() < bestCost) {
+                solution = current;
+            }
+            
+            if (!(containsEquivalent(c, current))) {
+                // If there is no equivalent state in the list c
+                c.add(current);
+                q.addAll(nextStates(current));
+            }
+        } while (solution == null || !q.isEmpty());
+
+        return solution;
+    }
+
+    // BFS-Algorithm
+    public State optimalBfs(State initialState) {
+        List<State> q = new ArrayList<State>();
+        q.add(initialState);
+        List<State> c = new ArrayList<State>();
+
+        State current;
+        State solution = null;
+        double bestWin = Double.NEGATIVE_INFINITY;
+
+        do {            
+            current = q.get(0);
+            q = q.subList(1, q.size());
+            
+            if (current.isFinalState()) {
+                if (current.totalWin() > bestWin) {
                     solution = current;
-                    bestCost = current.totalWin();
+                    bestWin = current.totalWin();
                 }
             }
             
-            if (!(c.contains(current))) {
+            if (!(containsEquivalent(c, current))) {
                 c.add(current);
                 q.addAll(nextStates(current));
             } else {
-                int i = c.indexOf(current);
-                State equiv = c.get(i);
-                
-                // Same state but different path leading to difference in win
-                if (equiv.totalWin() > current.totalWin()) {
-                    for (State s : q) {
-                        for (State currChild : nextStates(current)) {
-                            if (s.equals(currChild)) {
-                                // Different costs
-                                q.set(q.indexOf(s), currChild);
-                            }
-                        }
-                    }
+                State bestEquivalent = current.equivalentStates(c);
+                                
+                if (bestEquivalent.totalWin() < current.totalWin()) {
+                    c.remove(bestEquivalent);
+                    q.removeAll(nextStates(bestEquivalent));
+                    
+                    c.add(current);
+                    q.addAll(nextStates(current));
                 }
             }
         } while (!q.isEmpty());
+
+        return solution;
+    }
+    
+    public State aStar(State initialState) {
+        List<State> q = new ArrayList<State>();
+        q.add(initialState);
+        List<State> c = new ArrayList<State>();
+        
+        State current;
+        State solution = null;
+
+        do {            
+            current = q.get(0);
+            q = q.subList(1, q.size());
+            
+            if (current.isFinalState()) {
+                solution = current;
+            }
+            
+            if (!(containsEquivalent(c, current))) {
+                c.add(current);
+                q.addAll(nextStates(current));
+                q.sort(new Comparator<State>() {
+                    @Override
+                    public int compare(State s1, State s2) {
+                        return Double.compare(s2.totalWin(), s1.totalWin());
+                    }
+                });
+            }
+        } while (solution == null || !q.isEmpty());
+
+        return solution;
+    }
+    
+    public State cycleDetectionAStar(State initialState) {
+        List<State> q = new ArrayList<State>();
+        q.add(initialState);
+        List<State> c = new ArrayList<State>();
+        
+        State current;
+        State solution = null;
+
+        do {            
+            current = q.get(0);
+            q = q.subList(1, q.size());
+            
+            if (current.isFinalState()) {
+                solution = current;
+            }
+            
+            if (!(containsEquivalent(c, current))) {
+                c.add(current);
+                q.addAll(nextStates(current));
+            } else {
+                State bestEquivalent = current.equivalentStates(c);
+                                
+                if (bestEquivalent.totalWin() < current.totalWin()) {
+                    c.remove(bestEquivalent);
+                    q.removeAll(nextStates(bestEquivalent));
+                    
+                    c.add(current);
+                    q.addAll(nextStates(current));
+                }
+            }
+
+            q.sort(new Comparator<State>() {
+                @Override
+                public int compare(State s1, State s2) {
+                    return Double.compare(s2.totalWin(), s1.totalWin());
+                }
+            });
+        } while (solution == null || !q.isEmpty());
 
         return solution;
     }
@@ -166,57 +266,71 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
 
     @Override
     public Plan plan(Vehicle vehicle, TaskSet tasks) {
+        System.out.println();
+        System.out.println("Computing for " + vehicle.name() + " " + tasks);
         Plan plan;
+        
+        plan = new Plan(vehicle.getCurrentCity());
+        
+        // We construct the initial state
+        State.Builder initiaStateBuilder = new State.Builder();
+        
+        initiaStateBuilder.setAvailable(new ArrayList<Task>(tasks));
+        initiaStateBuilder.setToDeliver(new ArrayList<Task>(vehicle.getCurrentTasks()));
+        initiaStateBuilder.setAcceptableWeight(vehicle.capacity());
+        initiaStateBuilder.setHistory(new ArrayList<Decision>());
+        initiaStateBuilder.setCity(vehicle.getCurrentCity());
+        initiaStateBuilder.setTotalWin(0);
+        
+        State solution = null; 
 
         // Compute the plan with the selected algorithm.
         switch (algorithm) {
+            case CDASTAR:
+                solution = cycleDetectionAStar(initiaStateBuilder.build());
+                break;
             case ASTAR:
-                // ...
-                plan = naivePlan(vehicle, tasks);
+                solution = aStar(initiaStateBuilder.build());
                 break;
             case BFS:
-
-                // We construct the initial state
-
-                State.Builder initiaStateBuilder = new State.Builder();
-                List<StateTask> stateTasks = new ArrayList<StateTask>();
-                for (Task t : tasks) {
-                    stateTasks.add(new StateTask(t.pickupCity, t.deliveryCity, t.weight));
-                }
-                initiaStateBuilder.setAvailable(stateTasks);
-                initiaStateBuilder.setToDeliver(new ArrayList<StateTask>());
-                initiaStateBuilder.setAcceptableWeight(vehicle.capacity());
-                initiaStateBuilder.setHistory(new ArrayList<Decision>());
-                initiaStateBuilder.setCity(vehicle.getCurrentCity());
-                initiaStateBuilder.setTotalWin(0);
-
-                // We compute final state with bfs
-
-                State solution = bfs(initiaStateBuilder.build());
-
-                // We compute the successive actions to take, from bfs state
-                // history
-
-                List<Action> actions = new ArrayList<Action>();
-                for (Decision d : solution.history()) {
-                    StateTask st = d.task();
-                    for (Task t : tasks) {
-                        if (st.from().equals(t.pickupCity) && st.to().equals(t.deliveryCity)) {
-                            if (d.isGoAndDeliver()) {
-                                actions.add(new Action.Delivery(t));
-                            } else {
-                                actions.add(new Action.Pickup(t));
-                            }
-
-                        }
-                    }
-                }
-                plan = new Plan(vehicle.getCurrentCity(), actions);
-                System.out.println(plan);
+                solution = bfs(initiaStateBuilder.build());                
+                break;
+            case OBFS:
+                solution = optimalBfs(initiaStateBuilder.build());                
                 break;
             default:
                 throw new AssertionError("Should not happen.");
         }
+        
+        System.out.println(solution.history());
+        
+        if (solution == null) {
+            return plan;
+        }
+
+        // We compute the successive actions to take, from bfs state
+        // history
+        City lastCity = vehicle.getCurrentCity();
+
+        List<Action> actions = new ArrayList<Action>();
+        
+        for (Decision d : solution.history()) {
+            Task t = d.task();
+            
+            for (City c : lastCity.pathTo(d.destination())) {
+                plan.appendMove(c);
+            }
+            lastCity = d.destination();
+            if (d.isGoAndDeliver()) {
+                plan.appendDelivery(t);
+            } else {
+                plan.appendPickup(t);
+            }
+
+        }
+
+        System.out.println(solution.history());
+        
         return plan;
     }
 

@@ -1,25 +1,26 @@
 package template;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 
-import logist.task.TaskDistribution;
+import logist.task.Task;
 import logist.topology.Topology.City;
 
 public class State {
 
-	private List<StateTask> toDeliver;
-	private List<StateTask> available;
+	private List<Task> toDeliver;
+	private List<Task> available;
 	private List<Decision> doable;
 	private List<Decision> history;
 	private City currentCity;
 	private double weightAcceptable;
 	private double totalWin;
 	
-	public State(List<StateTask> toDeliver, List<StateTask> available, List<Decision> history, City currentCity,  double totalWin, double weightAcceptable) {
-		this.toDeliver = new ArrayList<StateTask>(toDeliver);
-		this.available = new ArrayList<StateTask>(available);
+	public State(List<Task> toDeliver, List<Task> available, List<Decision> history, City currentCity,  double totalWin, double weightAcceptable) {
+		this.toDeliver = new ArrayList<Task>(toDeliver);
+		this.available = new ArrayList<Task>(available);
 		this.history = new ArrayList<Decision>(history);
 		this.currentCity = currentCity;
 		this.weightAcceptable = weightAcceptable;
@@ -30,31 +31,31 @@ public class State {
 	
 	private void initDoable() {
 		doable = new ArrayList<Decision>(); 
-		for(StateTask t : toDeliver) {
-			doable.add(new GoAndDeliver(t.to(), t));
+		for(Task t : toDeliver) {
+		    doable.add(new GoAndDeliver(t));
 		}
-		for(StateTask t : available) {
-			if(t.weight() <= weightAcceptable) {
-				doable.add(new GoAndPickUp(t.from(), t));
+		for(Task t : available) {
+			if(t.weight <= weightAcceptable) {
+				doable.add(new GoAndPickUp(t));
 			}
 		}
 	}
 	
-	public List<StateTask> toDeliver() {
-		return new ArrayList<StateTask>(toDeliver);
+	public List<Task> toDeliver() {
+		return toDeliver;
 	}
 	
 	
-	public List<StateTask> available() {
-		return new ArrayList<StateTask>(available);
+	public List<Task> available() {
+		return available;
 	}
 	
 	public List<Decision> doable() {
-		return new ArrayList<Decision>(doable);
+		return doable;
 	}
 	
 	public List<Decision> history() {
-		return new ArrayList<Decision>(history); 
+		return history; 
 	}
 	
 	public City currentCity() {
@@ -74,18 +75,31 @@ public class State {
 	}
 	
 	
+	public boolean equivalent(State that) {
+		return new HashSet<Decision>(that.history()).equals(new HashSet<Decision>(history)) && that.currentCity().equals(currentCity);
+	}
+	
+	public State equivalentStates(List<State> list) {
+	    // We assume there is only one equivalent state
+	    for (State potentialEquiv : list) {
+	        if (this.equivalent(potentialEquiv)) {
+	            return potentialEquiv;
+	        }
+	    }
+	    return null;
+	}
+	
 	@Override
 	public boolean equals(Object o) {
-		if(o instanceof State) {
-			State oState = (State)o;
-			return oState.toDeliver().equals(toDeliver)     && 
-				   oState.available().equals(available)     && 
-				   oState.currentCity().equals(currentCity);
-			
-		} else {
-			return false;
-		}
+	    if(o instanceof State) {
+            State oState = (State)o;
+            return oState.history().equals(history)  && 
+                   oState.currentCity().equals(currentCity);
+        } else {
+            return false;
+        }
 	}
+	
 	
 	@Override
 	public int hashCode() {
@@ -97,26 +111,25 @@ public class State {
         return history.toString();
     }
 	
-	public static class Builder {
-		
+	public static class Builder {		
 	
-		private List<StateTask> toDeliver;
-		private List<StateTask> available;
+		private List<Task> toDeliver;
+		private List<Task> available;
 		private List<Decision> history;
 		private City currentCity;
 		private double totalWin;
 		private double acceptableWeight;
 		
-		public void setToDeliver(List<StateTask> toDeliver) {
-			this.toDeliver = new ArrayList<StateTask>(toDeliver);
+		public void setToDeliver(List<Task> toDeliver) {
+			this.toDeliver = toDeliver;
 		}
 		
-		public void setAvailable(List<StateTask> available) {
-			this.available = new ArrayList<StateTask>(available);
+		public void setAvailable(List<Task> available) {
+			this.available = available;
 		}
 		
 		public void setHistory(List<Decision> history) {
-			this.history = new ArrayList<Decision>(history);
+			this.history = history;
 		}
 		
 		public void setCity(City city) {

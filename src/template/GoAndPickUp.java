@@ -2,12 +2,12 @@ package template;
 
 import java.util.Objects;
 
-import logist.topology.Topology.City;
+import logist.task.Task;
 
 public class GoAndPickUp extends Decision {
 
-	public GoAndPickUp(City city, StateTask task) {
-		super(city, task);
+	public GoAndPickUp(Task task) {
+		super(task.pickupCity, task);
 	}
 
 	@Override
@@ -23,7 +23,7 @@ public class GoAndPickUp extends Decision {
 	@Override
 	public boolean equals(Object o) {
 		if (o instanceof GoAndPickUp) {
-			return destination().equals(((GoAndPickUp)o).destination());
+			return task().equals(((GoAndPickUp)o).task());
 		} else {
 			return false;
 		}
@@ -36,7 +36,7 @@ public class GoAndPickUp extends Decision {
     
     @Override
     public String toString() {
-        return "GAP " + destination() + " -> " + task().to();
+        return "GAP " + task();
     }
 
 }

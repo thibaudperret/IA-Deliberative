@@ -2,12 +2,12 @@ package template;
 
 import java.util.Objects;
 
-import logist.topology.Topology.City;
+import logist.task.Task;
 
 public class GoAndDeliver extends Decision {
 
-	public GoAndDeliver(City city, StateTask task) {
-		super(city, task);
+	public GoAndDeliver(Task task) {
+		super(task.deliveryCity, task);
 	}
 
 	@Override
@@ -24,7 +24,7 @@ public class GoAndDeliver extends Decision {
 	@Override
 	public boolean equals(Object o) {
 		if (o instanceof GoAndDeliver) {
-			return destination().equals(((GoAndDeliver)o).destination());
+			return task().equals(((GoAndDeliver)o).task());
 		} else {
 			return false;
 		}

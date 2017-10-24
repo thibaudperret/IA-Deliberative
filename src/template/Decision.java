@@ -1,13 +1,14 @@
 package template;
 
+import logist.task.Task;
 import logist.topology.Topology.City;
 
 public abstract class Decision {
 
 	private City destination;
-	private StateTask task;
+	private Task task;
 	
-	public Decision(City city, StateTask task) {
+	public Decision(City city, Task task) {
 		this.destination = city;
 		this.task = task;
 	}
@@ -15,7 +16,7 @@ public abstract class Decision {
 	public abstract boolean isGoAndPickup();
 	public abstract boolean isGoAndDeliver();
 
-	public StateTask task() {
+	public Task task() {
 		return task;
 	}
 	
