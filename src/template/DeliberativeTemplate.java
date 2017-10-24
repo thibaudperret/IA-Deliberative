@@ -39,7 +39,7 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
     Algorithm algorithm;
 
     /* Transition functions */
-    public State nextState(State current, Decision d) {
+    private State nextState(State current, Decision d) {
         if (d.isGoAndDeliver()) {
             // if we decide to deliver a packet
             
@@ -59,7 +59,7 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
             builder.setHistory(historyTmp);
             builder.setAcceptableWeight(current.acceptableWeight() + d.task().weight);
             builder.setToDeliver(toDeliverTmp);
-            double taskWin = - from.distanceTo(d.task().deliveryCity) * agent.vehicles().get(0).costPerKm()/* + d.task().reward */;
+            double taskWin = - from.distanceTo(d.task().deliveryCity) * agent.vehicles().get(0).costPerKm()/* + d.task().reward*/;
             builder.setTotalWin(current.totalWin() + taskWin);
 
             return builder.build();
@@ -92,7 +92,7 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
 
     }
 
-    public List<State> nextStates(State old) {
+    private List<State> nextStates(State old) {
         List<State> nextStates = new ArrayList<State>();
         for (Decision d : old.doable()) {
             nextStates.add(nextState(old, d));
@@ -100,7 +100,7 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
         return nextStates;
     }
     
-    private boolean containsEquivalent(List<State> c, State toCheck) {
+    private static boolean containsEquivalent(List<State> c, State toCheck) {
         for (State s : c) {
             if (s.equivalent(toCheck)) {
                 return true;
@@ -109,7 +109,9 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
         return false;
     }
     
-    public State bfs(State initialState) {
+    private State bfs(State initialState) {
+        int count = 0;
+        
         List<State> q = new ArrayList<State>();
         q.add(initialState);
         List<State> c = new ArrayList<State>();
@@ -119,24 +121,29 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
 
         do {            
             current = q.get(0);
-            q = q.subList(1, q.size());
+            ++count;
+            q = new ArrayList<State>(q.subList(1, q.size()));
             
             if (current.isFinalState()) {
                 solution = current;
             }
             
-            if (!(containsEquivalent(c, current))) {
+            if (!containsEquivalent(c, current)) {
                 // If there is no equivalent state in the list c
                 c.add(current);
                 q.addAll(nextStates(current));
             }
-        } while (solution == null || !q.isEmpty());
-
+        } while (solution == null && !q.isEmpty());
+        
+        System.out.println("Computed for " + count + " states");
+        
         return solution;
     }
 
     // BFS-Algorithm
-    public State optimalBfs(State initialState) {
+    private State optimalBfs(State initialState) {
+        int count = 0;
+        
         List<State> q = new ArrayList<State>();
         q.add(initialState);
         List<State> c = new ArrayList<State>();
@@ -147,7 +154,8 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
 
         do {            
             current = q.get(0);
-            q = q.subList(1, q.size());
+            ++count;
+            q = new ArrayList<State>(q.subList(1, q.size()));
             
             if (current.isFinalState()) {
                 if (current.totalWin() > bestWin) {
@@ -171,11 +179,15 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
                 }
             }
         } while (!q.isEmpty());
+        
+        System.out.println("Computed for " + count + " states");
 
         return solution;
     }
     
-    public State aStar(State initialState) {
+    private State aStar(State initialState) {
+        int count = 0;
+        
         List<State> q = new ArrayList<State>();
         q.add(initialState);
         List<State> c = new ArrayList<State>();
@@ -185,7 +197,8 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
 
         do {            
             current = q.get(0);
-            q = q.subList(1, q.size());
+            ++count;
+            q = new ArrayList<State>(q.subList(1, q.size()));
             
             if (current.isFinalState()) {
                 solution = current;
@@ -201,12 +214,16 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
                     }
                 });
             }
-        } while (solution == null || !q.isEmpty());
+        } while (solution == null && !q.isEmpty());
+        
+        System.out.println("Computed for " + count + " states");
 
         return solution;
     }
     
-    public State cycleDetectionAStar(State initialState) {
+    private State cycleDetectionAStar(State initialState) {
+        int count = 0;
+        
         List<State> q = new ArrayList<State>();
         q.add(initialState);
         List<State> c = new ArrayList<State>();
@@ -216,7 +233,8 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
 
         do {            
             current = q.get(0);
-            q = q.subList(1, q.size());
+            ++count;
+            q = new ArrayList<State>(q.subList(1, q.size()));
             
             if (current.isFinalState()) {
                 solution = current;
@@ -243,7 +261,9 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
                     return Double.compare(s2.totalWin(), s1.totalWin());
                 }
             });
-        } while (solution == null || !q.isEmpty());
+        } while (solution == null && !q.isEmpty());
+        
+        System.out.println("Computed for " + count + " states");
 
         return solution;
     }
@@ -257,6 +277,9 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
         // initialize the planner
         int capacity = agent.vehicles().get(0).capacity();
         String algorithmName = agent.readProperty("algorithm", String.class, "ASTAR");
+        
+        System.out.println();
+        System.out.println("With algorithm " + algorithmName);
 
         // Throws IllegalArgumentException if algorithm is unknown
         algorithm = Algorithm.valueOf(algorithmName.toUpperCase());
@@ -302,7 +325,7 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
                 throw new AssertionError("Should not happen.");
         }
         
-        System.out.println(solution.history());
+        System.out.println("\n" + solution.history());
         
         if (solution == null) {
             return plan;
@@ -326,14 +349,12 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
             } else {
                 plan.appendPickup(t);
             }
-
         }
-
-        System.out.println(solution.history());
         
         return plan;
     }
 
+    @Deprecated
     private Plan naivePlan(Vehicle vehicle, TaskSet tasks) {
         City current = vehicle.getCurrentCity();
         Plan plan = new Plan(current);
@@ -359,7 +380,6 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
 
     @Override
     public void planCancelled(TaskSet carriedTasks) {
-
         if (!carriedTasks.isEmpty()) {
             // This cannot happen for this simple agent, but typically
             // you will need to consider the carriedTasks when the next
