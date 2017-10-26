@@ -4,12 +4,10 @@ package template;
 import logist.simulation.Vehicle;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 import logist.agent.Agent;
 import logist.behavior.DeliberativeBehavior;
-import logist.plan.Action;
 import logist.plan.Plan;
 import logist.task.Task;
 import logist.task.TaskDistribution;
@@ -20,11 +18,10 @@ import logist.topology.Topology.City;
 /**
  * An optimal planner for one vehicle.
  */
-@SuppressWarnings("unused")
 public class DeliberativeTemplate implements DeliberativeBehavior {
 
     enum Algorithm {
-        BFS, OBFS, ASTAR, CDASTAR
+        BFS, EXH, ASTAR
     }
 
     /* Environment */
@@ -38,7 +35,9 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
     /* the planning class */
     Algorithm algorithm;
 
-    /* Transition functions */
+    /**
+     * @return a child of state current when doing decision d
+     */
     private State nextState(State current, Decision d) {
         if (d.isGoAndDeliver()) {
             // if we decide to deliver a packet
@@ -47,7 +46,6 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
             d = (GoAndDeliver) d;
 
             City from = current.currentCity();
-            City to = d.destination();
 
             List<Task> toDeliverTmp = new ArrayList<Task>(current.toDeliver());
             toDeliverTmp.remove(d.task());
@@ -68,7 +66,6 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
 
             State.Builder builder = new State.Builder();
             City from = current.currentCity();
-            City to = d.destination();
 
             List<Task> toDeliverTmp = new ArrayList<Task>(current.toDeliver());
             toDeliverTmp.add(d.task());
@@ -92,6 +89,9 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
 
     }
 
+    /**
+     * @return a list of states that are the children of a given state
+     */
     private List<State> nextStates(State old) {
         List<State> nextStates = new ArrayList<State>();
         for (Decision d : old.doable()) {
@@ -100,6 +100,9 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
         return nextStates;
     }
     
+    /**
+     * @return whether the set contains an equivalent state
+     */
     private static boolean containsEquivalent(List<State> c, State toCheck) {
         for (State s : c) {
             if (s.equivalent(toCheck)) {
@@ -109,6 +112,9 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
         return false;
     }
     
+    /**
+     * BFS algorithm
+     */
     private State bfs(State initialState) {
         int count = 0;
         
@@ -140,8 +146,10 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
         return solution;
     }
 
-    // BFS-Algorithm
-    private State optimalBfs(State initialState) {
+    /**
+     *  Exhaustive search
+     */
+    private State exhaustiveSearch(State initialState) {
         int count = 0;
         
         List<State> q = new ArrayList<State>();
@@ -168,7 +176,7 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
                 c.add(current);
                 q.addAll(nextStates(current));
             } else {
-                State bestEquivalent = current.equivalentStates(c);
+                State bestEquivalent = current.equivalentState(c);
                                 
                 if (bestEquivalent.totalWin() < current.totalWin()) {
                     c.remove(bestEquivalent);
@@ -185,6 +193,9 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
         return solution;
     }
     
+    /**
+     * A* algorithm
+     */
     private State aStar(State initialState) {
         int count = 0;
         
@@ -207,60 +218,8 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
             if (!(containsEquivalent(c, current))) {
                 c.add(current);
                 q.addAll(nextStates(current));
-                q.sort(new Comparator<State>() {
-                    @Override
-                    public int compare(State s1, State s2) {
-                        return Double.compare(s2.totalWin(), s1.totalWin());
-                    }
-                });
+                q.sort(new State.Heuristic());
             }
-        } while (solution == null && !q.isEmpty());
-        
-        System.out.println("Computed for " + count + " states");
-
-        return solution;
-    }
-    
-    private State cycleDetectionAStar(State initialState) {
-        int count = 0;
-        
-        List<State> q = new ArrayList<State>();
-        q.add(initialState);
-        List<State> c = new ArrayList<State>();
-        
-        State current;
-        State solution = null;
-
-        do {            
-            current = q.get(0);
-            ++count;
-            q = new ArrayList<State>(q.subList(1, q.size()));
-            
-            if (current.isFinalState()) {
-                solution = current;
-            }
-            
-            if (!(containsEquivalent(c, current))) {
-                c.add(current);
-                q.addAll(nextStates(current));
-            } else {
-                State bestEquivalent = current.equivalentStates(c);
-                                
-                if (bestEquivalent.totalWin() < current.totalWin()) {
-                    c.remove(bestEquivalent);
-                    q.removeAll(nextStates(bestEquivalent));
-                    
-                    c.add(current);
-                    q.addAll(nextStates(current));
-                }
-            }
-
-            q.sort(new Comparator<State>() {
-                @Override
-                public int compare(State s1, State s2) {
-                    return Double.compare(s2.totalWin(), s1.totalWin());
-                }
-            });
         } while (solution == null && !q.isEmpty());
         
         System.out.println("Computed for " + count + " states");
@@ -275,7 +234,6 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
         this.agent = agent;
 
         // initialize the planner
-        int capacity = agent.vehicles().get(0).capacity();
         String algorithmName = agent.readProperty("algorithm", String.class, "ASTAR");
         
         System.out.println();
@@ -283,8 +241,6 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
 
         // Throws IllegalArgumentException if algorithm is unknown
         algorithm = Algorithm.valueOf(algorithmName.toUpperCase());
-
-        // ...
     }
 
     @Override
@@ -309,17 +265,14 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
 
         // Compute the plan with the selected algorithm.
         switch (algorithm) {
-            case CDASTAR:
-                solution = cycleDetectionAStar(initiaStateBuilder.build());
-                break;
             case ASTAR:
                 solution = aStar(initiaStateBuilder.build());
                 break;
             case BFS:
                 solution = bfs(initiaStateBuilder.build());                
                 break;
-            case OBFS:
-                solution = optimalBfs(initiaStateBuilder.build());                
+            case EXH:
+                solution = exhaustiveSearch(initiaStateBuilder.build());                
                 break;
             default:
                 throw new AssertionError("Should not happen.");
@@ -327,34 +280,33 @@ public class DeliberativeTemplate implements DeliberativeBehavior {
         
         System.out.println("\n" + solution.history());
         
-        if (solution == null) {
-            return plan;
-        }
-
-        // We compute the successive actions to take, from bfs state
-        // history
         City lastCity = vehicle.getCurrentCity();
-
-        List<Action> actions = new ArrayList<Action>();
         
-        for (Decision d : solution.history()) {
-            Task t = d.task();
-            
-            for (City c : lastCity.pathTo(d.destination())) {
-                plan.appendMove(c);
-            }
-            lastCity = d.destination();
-            if (d.isGoAndDeliver()) {
-                plan.appendDelivery(t);
-            } else {
-                plan.appendPickup(t);
+        // if we have a solution
+        if (solution != null) {
+            for (Decision d : solution.history()) {
+                Task t = d.task();
+                
+                // add every move to the next city
+                for (City c : lastCity.pathTo(d.destination())) {
+                    plan.appendMove(c);
+                }
+                lastCity = d.destination();
+                // if we deliver
+                if (d.isGoAndDeliver()) {
+                    // add a delivery
+                    plan.appendDelivery(t);
+                } else {
+                    // add a pick up
+                    plan.appendPickup(t);
+                }
             }
         }
         
         return plan;
     }
 
-    @Deprecated
+    @SuppressWarnings("unused")
     private Plan naivePlan(Vehicle vehicle, TaskSet tasks) {
         City current = vehicle.getCurrentCity();
         Plan plan = new Plan(current);

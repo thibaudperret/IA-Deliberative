@@ -4,11 +4,22 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Comparator;
 
 import logist.task.Task;
 import logist.topology.Topology.City;
 
 public class State {
+    
+    public static class Heuristic implements Comparator<State> {
+
+        @Override
+        public int compare(State s1, State s2) {
+            // Reversed so we get a decreasing order in the list later
+            return Double.compare(s2.totalWin(), s1.totalWin());
+        }
+        
+    }
 
 	private List<Task> toDeliver;
 	private List<Task> available;
@@ -74,18 +85,24 @@ public class State {
 		return toDeliver.isEmpty() && available.isEmpty();
 	}
 	
-	
+	/**
+	 * Check whether the state given is equivalent
+	 */
 	public boolean equivalent(State that) {
 		return new HashSet<Decision>(that.history()).equals(new HashSet<Decision>(history)) && that.currentCity().equals(currentCity);
 	}
 	
-	public State equivalentStates(List<State> list) {
-	    // We assume there is only one equivalent state
+	/**
+	 * Gives back the equivalent state in the given list
+	 */
+	public State equivalentState(List<State> list) {
+	    // we assume there is only one equivalent state
 	    for (State potentialEquiv : list) {
 	        if (this.equivalent(potentialEquiv)) {
 	            return potentialEquiv;
 	        }
 	    }
+	    // should not happen in our case
 	    return null;
 	}
 	
